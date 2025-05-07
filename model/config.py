@@ -1,7 +1,7 @@
 PROJECT             = 'Retina-Face'
 RUN_NAME            = 'resnet18'
 # DATA config ================
-DATA_PATH           = './data'
+DATA_PATH           = '/kaggle/working/Retinaface_modify'
 N_CLASSES           = 2
 TRAIN_PATH          = './train'
 VALID_PATH          = './val'
