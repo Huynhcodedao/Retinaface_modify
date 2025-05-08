@@ -207,36 +207,9 @@ def forward(model, input, targets, anchors, loss_function, optimizer):
     cause the "CUDA out of memory". I've passed all require grad into
     a function to free it while there is nothing refer to it.
     """
-    print("[DEBUG] forward function - Computing loss and backprop")
     predict = model(input)
-    
-    # Debug predictions before loss computation
-    for i, pred in enumerate(predict):
-        print(f"[DEBUG] forward function - prediction[{i}] shape: {pred.shape}")
-        if torch.isnan(pred).any() or torch.isinf(pred).any():
-            print(f"[DEBUG] WARNING: Prediction {i} contains NaN or Inf!")
-        print(f"[DEBUG] forward function - prediction[{i}] min: {pred.min().item()}, max: {pred.max().item()}, mean: {pred.mean().item()}")
-    
-    # Debug targets before loss computation
-    print(f"[DEBUG] forward function - targets length: {len(targets)}")
-    for i, target in enumerate(targets[:2]):  # Debug first 2 targets
-        if target.shape[0] > 0:
-            print(f"[DEBUG] forward function - target[{i}] shape: {target.shape}")
-            print(f"[DEBUG] forward function - target[{i}] bbox example: {target[0, :4]}")
-        else:
-            print(f"[DEBUG] forward function - target[{i}] is empty!")
-    
-    # Debug anchors
-    print(f"[DEBUG] forward function - anchors shape: {anchors.shape}")
-    print(f"[DEBUG] forward function - anchors min: {anchors.min().item()}, max: {anchors.max().item()}")
-    
-    # Compute loss
     loss_l, loss_c, loss_landm = loss_function(predict, anchors, targets)
     loss = 1.3*loss_l + loss_c + loss_landm
-    
-    # Debug loss values
-    print(f"[DEBUG] forward function - Loss components - box: {loss_l.item()}, cls: {loss_c.item()}, landmark: {loss_landm.item()}")
-    print(f"[DEBUG] forward function - Total loss: {loss.item()}")
 
     loss_l      = loss_l.item()
     loss_c      = loss_c.item()
@@ -244,41 +217,11 @@ def forward(model, input, targets, anchors, loss_function, optimizer):
 
     # zero the gradient + backprpagation + step
     optimizer.zero_grad()
-    
-    # Kiểm tra đầu ra 
-    print(f"[DEBUG] forward function - Before backward, loss requires_grad: {loss.requires_grad}")
-    
+
     # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
-    
-    # Tiến hành backpropagation
+
     loss.backward()
-    
-    # Debug gradients
-    print("[DEBUG] forward function - After backward, checking gradients...")
-    total_norm = 0
-    param_count = 0
-    zero_grad_count = 0
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            param_count += 1
-            if param.grad is None:
-                print(f"[DEBUG] WARNING: {name} has no gradient!")
-                zero_grad_count += 1
-            else:
-                param_norm = param.grad.data.norm(2)
-                total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** 0.5
-    print(f"[DEBUG] forward function - Total gradient norm: {total_norm}")
-    print(f"[DEBUG] forward function - Parameters with no gradients: {zero_grad_count}/{param_count}")
-    
-    # Tiến hành bước optimizer
     optimizer.step()
-    
-    # Debug parameters after step
-    print("[DEBUG] forward function - After optimizer step, checking parameter changes...")
-    for name, param in list(model.named_parameters())[:5]:  # Kiểm tra 5 tham số đầu tiên
-        if param.requires_grad:
-            print(f"[DEBUG] forward function - {name} stats - mean: {param.data.mean().item()}, std: {param.data.std().item()}")
 
     del predict
     del loss

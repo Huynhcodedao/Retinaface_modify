@@ -1,52 +1,55 @@
-import os
-
 PROJECT             = 'Retina-Face'
-RUN_NAME            = 'retina-face-detector'
+RUN_NAME            = 'resnet18'
 # DATA config ================
 DATA_PATH           = './data'
 N_CLASSES           = 2
-TRAIN_PATH          = 'train'
-VALID_PATH          = 'val'
+TRAIN_PATH          = './train'
+VALID_PATH          = './val'
 TEST_PATH           = './test'
 SAVE_PATH           = './model'
 
-DATASET             = 'WIDER'
+DATASET             = 'wider-face-4k' 
 DVERSION            = 'latest'
 INPUT_SIZE          = 640
 BATCH_SIZE          = 8
 RANDOM_SEED         = 42
-NUM_WORKERS         = 2
+NUM_WORKERS         = 0
 
 # MODEL config ==============
-EPOCHS              = 10
-START_FRAME         = 32
-LEARNING_RATE       = 0.01
-LR_MILESTONE        = [1, 3, 5]
+EPOCHS              = 5
+START_FRAME         = 8
+LEARNING_RATE       = 1e-3
+LR_MILESTONE        = [4,9,14,19]
 WEIGHT_DECAY        = 5e-4
 MOMENTUM            = 0.9
 
 IN_CHANNELS         = 32
-OUT_CHANNELS        = 256
+OUT_CHANNELS        = 64
 
 # MobileNetV1
-FEATURE_MAP_MOBN1   = {'4':2, '8':3, '15':4, '15':5, '15':6}
-RETURN_MAP_MOBN1    = {'stage1': 4, 'stage2': 8, 'stage3': 15}
+# FEATURE_MAP_MOBN1   =  {'layer2': 160,
+#                         'layer3': 80,
+#                         'layer4': 40,
+#                         'layer5': 20,}
+FEATURE_MAP_MOBN1   = [2, 3, 4, 5]
+RETURN_MAP_MOBN1    =  {'layer2': 'out_feature2', 
+                        'layer3': 'out_feature3', 
+                        'layer4': 'out_feature4'}
 
 # MobileNetV2
-FEATURE_MAP_MOBN2   = {'features.3':2, 'features.6':3, 'features.13':4, 'features.13':5, 'features.13':6}
+FEATURE_MAP_MOBN2   = {}
+RETURN_LAYERS       = {'layer1': 1, 'layer2': 2, 'layer3': 3}
+# FEATURE_MAP         = {'layer2': 160, 'layer3': 80, 'layer4':40, 'layer5':20, 'layer6':10}
 
 # Resnet50
-FEATURE_MAP         = {'layer1':2, 'layer2':3, 'layer3':4, 'layer4':5, 'layer4':6}
-RETURN_MAP          = {'layer1':1, 'layer2':2, 'layer3':3, 'layer4':4}
+FEATURE_MAP         = [2, 3, 4, 5, 6]
+RETURN_MAP          = {'layer1': 'out_feature1',
+                        'layer2': 'out_feature2', 
+                        'layer3': 'out_feature3',
+                        'layer4': 'out_feature4'}
 
 # CRITERION config ==========
 OVERLAP_THRES       = 0.35
 BKG_LABEL           = 0
-NEG_MINING          = True
+NEG_MINING          = 7
 NEG_OVERLAP         = 0.35
-
-MIN_SIZES           = [[16, 32], [64, 128], [256, 512]]
-RGB_MEANS           = (104, 117, 123)
-VARIANCE            = [0.1, 0.2]
-
-USE_PRUNED_BACKBONE = True
