@@ -50,6 +50,11 @@ class Anchors(nn.Module):
             anchors         = torch.from_numpy(anchors).to(dtype=torch.float)
             shifted_anchors = shift(self.feat_shape[idx], self.strides[idx], anchors)
             
+            # QUAN TRỌNG: Scale anchors lên theo image_size 
+            # Tỷ lệ thực tế là từ [0-1] sang [0-640]
+            shifted_anchors[:, 0::2] = shifted_anchors[:, 0::2] * self.image_size[0]
+            shifted_anchors[:, 1::2] = shifted_anchors[:, 1::2] * self.image_size[1]
+
             all_anchors     = np.append(all_anchors, shifted_anchors, axis=0)
 
         all_anchors = torch.from_numpy(all_anchors).to(dtype=torch.float)
