@@ -59,6 +59,14 @@ class WiderFaceDataset(Dataset):
         key = self.latent_keys[index]
         bboxes = self.label_dict.get(key, [])
         annotations = np.zeros((len(bboxes), 15)) 
+        
+        # Debug
+        if index < 2:  # Chỉ debug 2 mẫu đầu tiên
+            print(f"[DEBUG] Dataset __getitem__ - key: {key}, latent shape: {latent.shape}")
+            print(f"[DEBUG] Dataset __getitem__ - number of bboxes: {len(bboxes)}")
+            if len(bboxes) > 0:
+                print(f"[DEBUG] Dataset __getitem__ - first bbox: {bboxes[0]}")
+        
         for idx, line in enumerate(bboxes):
             line = [float(x) for x in line.strip().split()]
             # bbox
@@ -69,6 +77,18 @@ class WiderFaceDataset(Dataset):
             # Nếu có landmark, bạn có thể bổ sung ở đây (nếu không thì giữ nguyên)
             # Nếu không có landmark, các cột còn lại giữ 0
             annotations[idx, 14] = 1  # label hợp lệ
+        
+        # Debug annotations sau khi xử lý
+        if index < 2 and len(bboxes) > 0:
+            print(f"[DEBUG] Dataset __getitem__ - annotations shape: {annotations.shape}")
+            print(f"[DEBUG] Dataset __getitem__ - first annotation: {annotations[0]}")
+            # Kiểm tra kích thước bbox có hợp lệ không
+            for i in range(annotations.shape[0]):
+                width = annotations[i, 2] - annotations[i, 0]
+                height = annotations[i, 3] - annotations[i, 1]
+                if width <= 0 or height <= 0:
+                    print(f"[DEBUG] WARNING: Invalid bbox dimensions for annotation {i}: width={width}, height={height}")
+        
         return latent, annotations
 
 def log_dataset(use_artifact, 

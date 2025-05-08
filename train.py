@@ -43,14 +43,52 @@ def train(model, anchors, trainloader, optimizer, loss_function, device='cpu'):
     loss_cls, loss_box, loss_pts = 0, 0, 0
     
     for i, (input, targets) in enumerate(trainloader):
+        # Debug: Kiểm tra dữ liệu đầu vào
+        if i == 0:  # Chỉ in lần đầu để tránh quá nhiều log
+            print(f"[DEBUG] Input shape: {input.shape}")
+            for j, target in enumerate(targets[:2]):  # Chỉ in 2 targets đầu tiên
+                print(f"[DEBUG] Target {j} shape: {target.shape}")
+                if target.shape[0] > 0:  # Nếu có bbox
+                    print(f"[DEBUG] Target {j} bbox example: {target[0][:4]}")
+                    print(f"[DEBUG] Target {j} label: {target[0][-1]}")
+                else:
+                    print(f"[DEBUG] Target {j} is empty!")
+        
         # load data into cuda
         input   = input.to(device)
         targets = [annos.to(device) for annos in targets]
+        
+        # Debug: Kiểm tra targets sau khi chuyển sang device
+        if i == 0:
+            for j, target in enumerate(targets[:2]):
+                if target.shape[0] > 0:
+                    print(f"[DEBUG] Target {j} on device shape: {target.shape}")
+                    print(f"[DEBUG] Target {j} bbox sum: {target[:, :4].sum()}")
+                else:
+                    print(f"[DEBUG] Target {j} on device is empty!")
+        
         predict = model(input)
         print(f"[DEBUG] anchors shape: {anchors.shape}")
         print(f"[DEBUG] bbox regression output shape: {predict[0].shape}")
+        
+        # Debug: Kiểm tra đầu ra của model
+        if i == 0:
+            for j, pred in enumerate(predict):
+                print(f"[DEBUG] Prediction {j} shape: {pred.shape}")
+                print(f"[DEBUG] Prediction {j} min: {pred.min().item()}, max: {pred.max().item()}, mean: {pred.mean().item()}")
+                # Kiểm tra NaN hoặc Inf
+                if torch.isnan(pred).any() or torch.isinf(pred).any():
+                    print(f"[DEBUG] WARNING: Prediction {j} contains NaN or Inf!")
+        
         # forward + backpropagation + step
         loss_l, loss_c, loss_landm = forward(model, input, targets, anchors, loss_function, optimizer)
+        
+        # Debug: Kiểm tra loss
+        if i == 0:
+            print(f"[DEBUG] Loss values - box: {loss_l}, cls: {loss_c}, landmark: {loss_landm}")
+        
+        # In ra tất cả các giá trị loss
+        print(f"[DEBUG] Batch {i} - Loss values - box: {loss_l}, cls: {loss_c}, landmark: {loss_landm}")
 
         # metric
         loss_cls += loss_c
@@ -76,6 +114,15 @@ def evaluate(model, anchors, validloader, loss_function, best_box, device='cpu')
 
     with torch.no_grad():
         for i, (input, targets) in enumerate(validloader):
+            # Debug: Kiểm tra dữ liệu validation
+            if i == 0:
+                print(f"[DEBUG] Val input shape: {input.shape}")
+                print(f"[DEBUG] Val targets len: {len(targets)}")
+                if len(targets) > 0 and targets[0].shape[0] > 0:
+                    print(f"[DEBUG] Val target example: {targets[0][0][:4]}")
+                else:
+                    print(f"[DEBUG] Val target is empty!")
+            
             # load data into cuda
             input   = input.to(device)
             targets = [annos.to(device) for annos in targets]
@@ -83,6 +130,10 @@ def evaluate(model, anchors, validloader, loss_function, best_box, device='cpu')
             # forward
             predict = model(input)
             loss_l, loss_c, loss_landm = loss_function(predict, anchors, targets)
+            
+            # Debug: Kiểm tra loss trong validation
+            if i == 0:
+                print(f"[DEBUG] Val loss - box: {loss_l.item()}, cls: {loss_c.item()}, landmark: {loss_landm.item()}")
 
             # metric
             loss_cls += loss_c
@@ -141,6 +192,13 @@ if __name__ == '__main__':
     valid_set = WiderFaceDataset(root_path=DATA_PATH, input_size=args.image_size, is_train=False)
     
     print(f"\tNumber of training example: {len(train_set)}\n\tNumber of validation example: {len(valid_set)}")
+    
+    # Debug: Kiểm tra một mẫu dữ liệu đầu tiên
+    print(f"[DEBUG] Checking first sample data...")
+    sample_data, sample_target = train_set[0]
+    print(f"[DEBUG] Sample data shape: {sample_data.shape}")
+    print(f"[DEBUG] Sample target shape: {sample_target.shape}")
+    print(f"[DEBUG] Sample target content: {sample_target}")
 
     torch.manual_seed(RANDOM_SEED)
 
@@ -176,6 +234,11 @@ if __name__ == '__main__':
             scales=[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)],
             feat_shape=feat_shape
         ).forward().to(device)
+        
+        # Debug: Kiểm tra anchors
+        print(f"[DEBUG] Anchors shape: {anchors.shape}")
+        print(f"[DEBUG] Anchors min: {anchors.min().item()}, max: {anchors.max().item()}")
+        print(f"[DEBUG] First 3 anchors: {anchors[:3]}")
 
     # optimizer + citeration
     optimizer   = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)

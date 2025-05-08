@@ -74,18 +74,42 @@ def match(threshold, truths, priors, variances, labels, landms, loc_t, conf_t, l
     Return:
         The matched indices corresponding to 1)location 2)confidence 3)landm preds.
     """
+    # Debug thông tin đầu vào
+    if idx < 2:  # Chỉ debug 2 batch đầu
+        print(f"[DEBUG] match function - truths shape: {truths.shape}, priors shape: {priors.shape}")
+        if truths.shape[0] > 0:
+            print(f"[DEBUG] match function - truth example: {truths[0]}")
+            print(f"[DEBUG] match function - prior example: {priors[0]}")
+    
     # jaccard index
     overlaps = jaccard(truths, priors)
+    
+    # Debug overlaps
+    if idx < 2 and truths.shape[0] > 0:
+        print(f"[DEBUG] match function - overlaps shape: {overlaps.shape}")
+        print(f"[DEBUG] match function - overlaps max: {overlaps.max().item()}, min: {overlaps.min().item()}, mean: {overlaps.mean().item()}")
+        # Nếu max overlap quá thấp, đây có thể là vấn đề
+        if overlaps.max().item() < threshold:
+            print(f"[DEBUG] WARNING: Max overlap {overlaps.max().item()} is less than threshold {threshold}!")
 
     # (Bipartite Matching)
     # [1,num_objects] best prior for each ground truth
     best_prior_overlap, best_prior_idx = overlaps.max(1, keepdim=True)
+    
+    if idx < 2 and truths.shape[0] > 0:
+        print(f"[DEBUG] match function - best_prior_overlap: {best_prior_overlap.view(-1)}")
+        print(f"[DEBUG] match function - best_prior_idx: {best_prior_idx.view(-1)}")
 
     # ignore hard gt
     valid_gt_idx = best_prior_overlap[:, 0] >= 0.2
     best_prior_idx_filter = best_prior_idx[valid_gt_idx, :]
+    
+    if idx < 2:
+        print(f"[DEBUG] match function - valid_gt_idx sum: {valid_gt_idx.sum().item()} out of {valid_gt_idx.shape[0]}")
+        print(f"[DEBUG] match function - best_prior_idx_filter shape: {best_prior_idx_filter.shape}")
 
     if best_prior_idx_filter.shape[0] <= 0:
+        print(f"[DEBUG] WARNING: No valid ground truth found in batch {idx} with overlap >= 0.2!")
         loc_t[idx] = 0
         conf_t[idx] = 0
 
@@ -99,6 +123,10 @@ def match(threshold, truths, priors, variances, labels, landms, loc_t, conf_t, l
     best_prior_idx_filter.squeeze_(1)
     best_prior_overlap.squeeze_(1)
     best_truth_overlap.index_fill_(0, best_prior_idx_filter, 2)  # ensure best prior
+    
+    if idx < 2:
+        print(f"[DEBUG] match function - best_truth_overlap updated count > threshold: {(best_truth_overlap > threshold).sum().item()}")
+    
     # TODO refactor: index  best_prior_idx with long tensor
     # ensure every gt matches with its prior of max overlap
     for j in range(best_prior_idx.size(0)):     # 判别此anchor是预测哪一个boxes
@@ -106,6 +134,12 @@ def match(threshold, truths, priors, variances, labels, landms, loc_t, conf_t, l
     matches = truths[best_truth_idx]            # Shape: [num_priors,4] 此处为每一个anchor对应的bbox取出来
     conf = labels[best_truth_idx]               # Shape: [num_priors]      此处为每一个anchor对应的label取出来
     conf[best_truth_overlap < threshold] = 0    # label as background   overlap<0.35的全部作为负样本
+    
+    if idx < 2:
+        print(f"[DEBUG] match function - matches shape: {matches.shape}")
+        print(f"[DEBUG] match function - conf shape: {conf.shape}")
+        print(f"[DEBUG] match function - positive samples: {(conf > 0).sum().item()}")
+    
     loc = encode(matches, priors, variances)
 
     matches_landm = landms[best_truth_idx]
@@ -113,6 +147,11 @@ def match(threshold, truths, priors, variances, labels, landms, loc_t, conf_t, l
     loc_t[idx] = loc    # [num_priors,4] encoded offsets to learn
     conf_t[idx] = conf  # [num_priors] top class label for each prior
     landm_t[idx] = landm
+    
+    if idx < 2:
+        print(f"[DEBUG] match function - loc_t[{idx}] shape: {loc_t[idx].shape}, non-zero: {(loc_t[idx] != 0).sum().item()}")
+        print(f"[DEBUG] match function - conf_t[{idx}] shape: {conf_t[idx].shape}, positive: {(conf_t[idx] > 0).sum().item()}")
+        print(f"[DEBUG] match function - landm_t[{idx}] shape: {landm_t[idx].shape}, non-zero: {(landm_t[idx] != 0).sum().item()}")
 
     return loc_t, conf_t, landm_t
 
