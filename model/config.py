@@ -3,10 +3,10 @@ import os
 PROJECT             = 'Retina-Face'
 RUN_NAME            = 'retina-face-detector'
 # DATA config ================
-DATA_PATH           = '.'
+DATA_PATH           = './data'
 N_CLASSES           = 2
 TRAIN_PATH          = 'train'
-VALID_PATH          = 'eval'
+VALID_PATH          = 'val'
 TEST_PATH           = './test'
 SAVE_PATH           = './model'
 
