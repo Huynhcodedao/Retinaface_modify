@@ -1,0 +1,15 @@
+/data/test
+/data/train
+/data/val
+/wandb
+*/__pycache__
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.pth
+*.onnx
