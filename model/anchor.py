@@ -49,15 +49,14 @@ class Anchors(nn.Module):
             anchors         = generate_anchors(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
             anchors         = torch.from_numpy(anchors).to(dtype=torch.float)
             shifted_anchors = shift(self.feat_shape[idx], self.strides[idx], anchors)
-            # from IPython import embed
-            # embed()
-            # shifted_anchors = shifted_anchors/self.image_size[0]
-            shifted_anchors[:, 0::2] = shifted_anchors[:, 0::2]/self.image_size[0]
-            shifted_anchors[:, 1::2] = shifted_anchors[:, 1::2]/self.image_size[1]
-
+            
             all_anchors     = np.append(all_anchors, shifted_anchors, axis=0)
 
         all_anchors = torch.from_numpy(all_anchors).to(dtype=torch.float)
+
+        # In debug để kiểm tra
+        print(f"[DEBUG] Anchors min: {all_anchors.min().item()}, max: {all_anchors.max().item()}")
+        print(f"[DEBUG] First 3 anchors: {all_anchors[:3]}")
 
         return all_anchors
 

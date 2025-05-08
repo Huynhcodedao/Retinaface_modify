@@ -59,6 +59,14 @@ class MultiBoxLoss(nn.Module):
         priors = priors
         num = loc_data.size(0)
         num_priors = (priors.size(0))
+        
+        # Debug thông tin đầu vào
+        print(f"[DEBUG] Prediction 0 shape: {loc_data.shape}")
+        print(f"[DEBUG] Prediction 0 min: {loc_data.min().item()}, max: {loc_data.max().item()}, mean: {loc_data.mean().item()}")
+        print(f"[DEBUG] Prediction 1 shape: {conf_data.shape}")
+        print(f"[DEBUG] Prediction 1 min: {conf_data.min().item()}, max: {conf_data.max().item()}, mean: {conf_data.mean().item()}")
+        print(f"[DEBUG] Prediction 2 shape: {landm_data.shape}")
+        print(f"[DEBUG] Prediction 2 min: {landm_data.min().item()}, max: {landm_data.max().item()}, mean: {landm_data.mean().item()}")
 
         # match priors (default boxes) and ground truth boxes
         loc_t   = torch.Tensor(num, num_priors, 4)
@@ -70,6 +78,18 @@ class MultiBoxLoss(nn.Module):
             landms = targets[idx][:, 4:14].data
             defaults = priors.data
             
+            # Debug thông tin targets
+            if idx < 2:  # Chỉ debug 2 batch đầu
+                print(f"[DEBUG] Target {idx} shape: {targets[idx].shape}")
+                if targets[idx].shape[0] > 0:
+                    print(f"[DEBUG] Target {idx} bbox example: {targets[idx][0, :4]}")
+                    print(f"[DEBUG] Target {idx} label: {targets[idx][0, -1]}")
+                    
+            # In thông tin debug sau khi chuyển sang GPU
+            if idx < 2:
+                print(f"[DEBUG] Target {idx} on device shape: {truths.shape}")
+                print(f"[DEBUG] Target {idx} bbox sum: {truths.sum().item()}")
+                
             loc_t, conf_t, landm_t = match(self.threshold, 
                                         truths, defaults, 
                                         self.variance, labels, 
@@ -79,6 +99,9 @@ class MultiBoxLoss(nn.Module):
             loc_t   = loc_t.to(self.device)
             conf_t  = conf_t.to(self.device)
             landm_t = landm_t.to(self.device)
+        
+        # In kết quả loss để debug
+        loss_l, loss_c, loss_landm = 0.0, 0.0, 0.0
 
         zeros = torch.tensor(0).to(self.device)
         # landm Loss (Smooth L1)
@@ -126,5 +149,9 @@ class MultiBoxLoss(nn.Module):
         loss_l /= N
         loss_c /= N
         loss_landm /= N1
+        
+        # In kết quả loss để debug
+        print(f"[DEBUG] Loss values - box: {loss_l.item()}, cls: {loss_c.item()}, landmark: {loss_landm.item()}")
+        print(f"[DEBUG] Batch {idx} - Loss values - box: {loss_l.item()}, cls: {loss_c.item()}, landmark: {loss_landm.item()}")
 
         return loss_l, loss_c, loss_landm
