@@ -131,6 +131,13 @@ class MultiBoxLoss(nn.Module):
         # Debug landm loss
         print(f"[DEBUG] landm loss - pos1 sum: {pos1.sum().item()}, num_pos_landm: {num_pos_landm.sum().item()}, N1: {N1.item()}")
         
+        # FIX: Xử lý trường hợp không có positive samples
+        if pos1.sum().item() == 0:
+            print("[DEBUG] No positive samples found, returning zero losses")
+            return torch.tensor(0.0, requires_grad=True, device=self.device), \
+                   torch.tensor(0.0, requires_grad=True, device=self.device), \
+                   torch.tensor(0.0, requires_grad=True, device=self.device)
+        
         pos_idx1 = pos1.unsqueeze(pos1.dim()).expand_as(landm_data)
         landm_p = landm_data[pos_idx1].view(-1, 10)
         landm_t = landm_t[pos_idx1].view(-1, 10)

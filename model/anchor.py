@@ -6,60 +6,121 @@ from model.config import *
 from utils.box_utils import point_form
 
 class Anchors(nn.Module):
-    def __init__(self, image_size=None, feat_shape=None, pyramid_levels=None, strides=None, sizes=None, ratios=None, scales=None):
+    def __init__(self, pyramid_levels=[2, 3, 4, 5, 6], image_size=(640, 640), 
+                 ratios=[1.0], scales=[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)],
+                 feat_shape=None):
+        """
+        Sample anchorbox for RetinaNet.
+
+        Args:
+            pyramid_levels (list): Feature pyramid levels to use
+            image_size (tuple): (h, w) of image size
+            ratios (list): List of ratios, each have 3 scales
+            scales (list): List of scales for each ratio
+
+        Returns:
+            anchors: (h, w, 4) Generated anchor box of (x, y, w, h)
+        """
         super(Anchors, self).__init__()
-        # init param
         self.pyramid_levels = pyramid_levels
-        self.strides        = strides
-        self.ratios         = ratios
-        self.scales         = scales
-        self.sizes          = sizes
-        self.feat_shape     = feat_shape
-        self.image_size     = image_size
-
-        if pyramid_levels is None:
-            # the original pyramid net have P2, P3, P4, P5, P6, C7/P7
-            self.pyramid_levels = [3, 4, 5, 6, 7]
+        self.image_size = image_size
         
-        if strides is None:
-            self.strides = [2 ** (x) for x in self.pyramid_levels]
-
-        if sizes is None:
-            self.sizes = [2 ** (x+1) for x in self.pyramid_levels]
-
-        if ratios is None:
-            # most of bounding box in wider face were 1/2 and 2 in ratio aspect
-            self.ratios = [0.5, 1]
-
-        if scales is None:
-            # defaul scale defined in paper is 2^(1/3)
-            self.scales = [2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]
-
-        if image_size is None: 
-            self.image_size = np.array([INPUT_SIZE, INPUT_SIZE])
-
-        if feat_shape is None:
-            self.feat_shape = [((self.image_size[0] + x - 1) // x, (self.image_size[1] + x - 1) // x) for x in self.strides]
+        # Debug trước khi đổi
+        print(f"[DEBUG] Anchors init - Original ratios: {ratios}, scales: {scales}")
         
+        # FIX: Thêm nhiều ratios hơn để bắt được các khuôn mặt có nhiều dạng khác nhau
+        # Faces thường có ratio từ 1:1 đến 1:1.5
+        self.ratios = [0.75, 1.0, 1.33]  # thay vì chỉ [1.0]
+        
+        # FIX: Đa dạng hóa scales để bắt được faces ở nhiều kích thước khác nhau
+        # Với input size 640x640, faces có thể chiếm từ 5% đến 30% kích thước ảnh
+        self.scales = [2 ** (-0.5), 2 ** 0, 2 ** 0.5]  # thêm scale nhỏ hơn và lớn hơn
+        
+        # Debug sau khi đổi
+        print(f"[DEBUG] Anchors init - New ratios: {self.ratios}, scales: {self.scales}")
+        
+        self.strides = [2 ** x for x in self.pyramid_levels]
+        self.feat_shape = feat_shape
+        self.sizes = []
+        for i in range(len(self.pyramid_levels)):
+            if self.feat_shape is not None:
+                self.sizes.append([self.feat_shape[i][0], self.feat_shape[i][1]])
+            else:
+                self.sizes.append([image_size[0] // self.strides[i], image_size[1] // self.strides[i]])
+
     def forward(self):
-        # compute anchors over all pyramid levels
-        all_anchors = np.zeros((0, 4)).astype(np.float32)
-
+        anchors = []
         for idx, p in enumerate(self.pyramid_levels):
-            anchors         = generate_anchors(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
-            anchors         = torch.from_numpy(anchors).to(dtype=torch.float)
-            shifted_anchors = shift(self.feat_shape[idx], self.strides[idx], anchors)
-            # from IPython import embed
-            # embed()
-            # shifted_anchors = shifted_anchors/self.image_size[0]
-            shifted_anchors[:, 0::2] = shifted_anchors[:, 0::2]/self.image_size[0]
-            shifted_anchors[:, 1::2] = shifted_anchors[:, 1::2]/self.image_size[1]
+            # for all anchors in one pyramid level (e.g. 80x80, 40x40, 20x20, 10x10)
+            x_size, y_size = self.sizes[idx]
+            grid_height, grid_width = y_size, x_size
 
-            all_anchors     = np.append(all_anchors, shifted_anchors, axis=0)
+            strides = self.strides[idx]
+            stride = torch.tensor([strides, strides])
 
-        all_anchors = torch.from_numpy(all_anchors).to(dtype=torch.float)
+            # generate center offset for each pixel 
+            shift_x = torch.arange(0, grid_width) + 0.5
+            shift_y = torch.arange(0, grid_height) + 0.5
 
-        return all_anchors
+            # repeat to get meshgrid
+            shift_x = shift_x.unsqueeze(0).repeat(grid_height, 1).view(-1)
+            shift_y = shift_y.unsqueeze(1).repeat(1, grid_width).view(-1)
+
+            # all grid points
+            shift = torch.stack([shift_x, shift_y], dim=1)
+            
+            # Normalize coordinates to [0-1] range
+            shifts = shift * stride / torch.tensor(self.image_size)
+            
+            # Generate all box combinations for one image
+            # box_widths = []
+            # box_heights = []
+            # box_scales = []
+            # box_ratios = []
+
+            # for ratio in self.ratios:
+            #     for scale in self.scales:
+            #         box_scales.append(scale)
+            #         box_ratios.append(ratio)
+
+            #         # convert ratio to height and width ratio
+            #         ratio_sqrt = np.sqrt(ratio)
+            #         box_widths.append(scale / ratio_sqrt)
+            #         box_heights.append(scale * ratio_sqrt)
+
+            boxes = []
+            # for each scale, ratio, we generate one box for each pixel
+            for scale in self.scales:
+                for ratio in self.ratios:
+                    # FIX: Tính toán kích thước box từ ratio và scale
+                    # Scale là hệ số điều chỉnh kích thước chung của box
+                    # Ratio là tỷ lệ width/height, cần điều chỉnh riêng cho width và height
+                    ratio_sqrt = torch.sqrt(torch.tensor(ratio))
+                    base_anchor_size = 0.15  # FIX: base size tương đương với 15% kích thước ảnh
+                    width = base_anchor_size * scale / ratio_sqrt
+                    height = base_anchor_size * scale * ratio_sqrt
+                    boxes.append(torch.tensor([0, 0, width, height]))
+            
+            # cat and reshape
+            boxes = torch.stack(boxes, dim=0)
+            all_anchors = shifts.unsqueeze(1) + torch.cat([torch.zeros_like(boxes[:, :2]), boxes[:, 2:]], dim=1)
+            
+            # FIX: Chuyển từ center-size format sang x1,y1,x2,y2 format
+            all_anchors = torch.cat([
+                all_anchors[:, :2] - all_anchors[:, 2:] / 2,  # x1, y1
+                all_anchors[:, :2] + all_anchors[:, 2:] / 2   # x2, y2
+            ], dim=1)
+            
+            # Kiểm tra xem có anchor nào bị âm hoặc lớn hơn 1 không
+            if (all_anchors < 0).any() or (all_anchors > 1).any():
+                print(f"[DEBUG] Warning: Some anchors are outside [0, 1] range")
+                # Đảm bảo anchors nằm trong khoảng [0, 1]
+                all_anchors = torch.clamp(all_anchors, 0, 1)
+            
+            anchors.append(all_anchors.reshape(-1, 4))
+            
+        anchors = torch.cat(anchors, dim=0)
+        return anchors
 
 def generate_anchors(num_anchors=None, base_size=8, ratios=None, scales=None):
     """
